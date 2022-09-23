@@ -12,4 +12,4 @@ You can give up to 2 integer parameters to the program to define the Matrix size
 Matrixes are currently filled randomly by using numpy. There's no close future plans to change that.
 
 ## Future plans
-Ability to provide 3 sizes and CPU multithreading
+Ability to provide 3 sizes and ~~CPU multithreading~~
