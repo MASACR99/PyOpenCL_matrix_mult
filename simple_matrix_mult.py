@@ -46,6 +46,7 @@ matrix3 = numpy.empty((size_x, size_y)).astype(numpy.float32)
 # Start single core multiplication
 for x in range(len(matrix3)):
     for y in range(len(matrix3[0])):
+        matrix3[x][y] = 0
         for z in range(len(matrix1[0])):
             matrix3[x][y] += (matrix1[x][z]*matrix2[z][y])
          
@@ -69,6 +70,7 @@ def multithread_multiplication(matrix1, matrix2, result_matrix, starting, jump):
         x = x - len(matrix1)
     try:
         while (x < len(matrix1[0]) and y < len(matrix1)):
+            result_matrix[x][y] = 0
             for z in range(len(matrix1[0])):
                 result_matrix[x][y] += (matrix1[x][z]*matrix2[z][y])
             x += jump
@@ -144,7 +146,16 @@ __kernel void multiplication(__global const float *matrix1_g, __global const flo
 
 # Generate result variable and buffer to receive result
 result_matrix = numpy.empty((size_x, size_y)).astype(numpy.float32)
+for i in range(len(result_matrix)):
+    for j in range(len(result_matrix[0])):
+        result_matrix[i][j] = 0.0
 result_matrix_g = cl.Buffer(ctx, mf.WRITE_ONLY, result_matrix.nbytes)
+
+knl = prg.multiplication
+event = knl(queue, result_matrix.shape, None, matrix1_g,matrix2_g,result_matrix_g)
+event.wait()
+
+cl.enqueue_copy(queue, result_matrix, result_matrix_g)
 
 t1 = time.time()
 
@@ -154,7 +165,9 @@ gpu_time = t1-t0
 print("GPU took: " + str(gpu_time) + "s\n")
 
 # Debugging/show result print
-#print(result_matrix)
+# print(matrix3)
+# print(result_matrix_multi)
+# print(result_matrix)
 
 # Compare execution times and get % increase in performance
 if (cpu_multi_time > cpu_single_time):
@@ -171,4 +184,4 @@ print("")
 if (cpu_fastest > gpu_time):
     print("GPU was faster than CPU " + cpu_fastest_name + " by " + str(round((cpu_fastest*100)/gpu_time,2)) + "%")
 else:
-    print("CPU was faster than CPU " + cpu_fastest_name + " by " + str(round((gpu_time*100)/cpu_fastest,2)) + "%")
+    print("CPU was faster than GPU by " + str(round((gpu_time*100)/cpu_fastest,2)) + "%")
