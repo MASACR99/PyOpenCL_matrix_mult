@@ -42,7 +42,7 @@ print("First matrix multiplication with CPU single-core")
 t0 = time.time()
 
 # Generate matrix to sabe results in
-matrix3 = [[0.0 for x in range(len(matrix1))] for y in range(len(matrix2[0]))]
+matrix3 = numpy.empty((size_x, size_y)).astype(numpy.float32)
 # Start single core multiplication
 for x in range(len(matrix3)):
     for y in range(len(matrix3[0])):
@@ -81,7 +81,7 @@ def multithread_multiplication(matrix1, matrix2, result_matrix, starting, jump):
 t0 = time.time()
 
 threads = []
-result_matrix_multi = [[0.0 for x in range(len(matrix1))] for y in range(len(matrix2[0]))]
+result_matrix_multi = numpy.empty((size_x, size_y)).astype(numpy.float32)
 # Find best thread size
 if (os.cpu_count() > (size_x*size_y)):
     range_value = size_x*size_y
@@ -169,6 +169,6 @@ else:
 print("")
 
 if (cpu_fastest > gpu_time):
-    print("GPU was faster than CPU" + cpu_fastest_name + " by " + str(round((cpu_fastest*100)/gpu_time,2)) + "%")
+    print("GPU was faster than CPU " + cpu_fastest_name + " by " + str(round((cpu_fastest*100)/gpu_time,2)) + "%")
 else:
-    print("CPU was faster than CPU" + cpu_fastest_name + " by " + str(round((gpu_time*100)/cpu_fastest,2)) + "%")
+    print("CPU was faster than CPU " + cpu_fastest_name + " by " + str(round((gpu_time*100)/cpu_fastest,2)) + "%")
