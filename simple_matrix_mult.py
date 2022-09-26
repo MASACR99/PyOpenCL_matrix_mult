@@ -1,3 +1,4 @@
+import re
 from threading import Thread
 import pyopencl as cl
 import numpy
@@ -42,7 +43,7 @@ print("First matrix multiplication with CPU single-core")
 t0 = time.time()
 
 # Generate matrix to sabe results in
-matrix3 = numpy.empty((size_x, size_y)).astype(numpy.float32)
+matrix3 = numpy.empty((size_x, size_x)).astype(numpy.float32)
 # Start single core multiplication
 for x in range(len(matrix3)):
     for y in range(len(matrix3[0])):
@@ -63,33 +64,38 @@ print("CPU multithreading starts")
 
 # Define multithreaded function
 def multithread_multiplication(matrix1, matrix2, result_matrix, starting, jump):
-    x = starting
-    y = 0
-    while (x >= len(matrix1)):
-        y += 1
-        x = x - len(matrix1)
+    x = 0
+    y = starting
+    while (y >= len(result_matrix[0])):
+        x += 1
+        y = y - len(result_matrix[0])
     try:
-        while (x < len(matrix1[0]) and y < len(matrix1)):
+        while (x < len(result_matrix)):
             result_matrix[x][y] = 0
+
             for z in range(len(matrix1[0])):
                 result_matrix[x][y] += (matrix1[x][z]*matrix2[z][y])
-            x += jump
-            if (x >= len(matrix1)):
-                y += 1
-                x -= len(matrix1)
+            
+            y = y + jump        
+            
+            while (y >= len(result_matrix[0])):
+                x += 1
+                y = y - len(result_matrix[0])
+            
     except:
         print("Something went wrong. X:" + str(x) + "Y:" + str(y))
     
 t0 = time.time()
 
 threads = []
-result_matrix_multi = numpy.empty((size_x, size_y)).astype(numpy.float32)
+result_matrix_multi = numpy.empty((size_x, size_x)).astype(numpy.float32)
 # Find best thread size
 if (os.cpu_count() > (size_x*size_y)):
     range_value = size_x*size_y
 else:
     range_value = os.cpu_count()
 
+print("Number of threads to generate: " + str(range_value))
 # Generate and execute threads
 for i in range(range_value):
     threads.append(Thread(target=multithread_multiplication,args=((matrix1, matrix2, result_matrix_multi,i,range_value))))
@@ -136,16 +142,16 @@ __kernel void multiplication(__global const float *matrix1_g, __global const flo
     __local float float_result;
     float_result = 0;
 
-    for(int z = 0; z < WA;z++){
+    for(int z = 0; z < HA;z++){
         //printf("X: %%d Y: %%d Z: %%d -> %%f & %%f\\n",x,y,z,matrix1_g[y*WA+z],matrix2_g[x+z*WB]);
-        float_result += (matrix1_g[y*WA+z] * matrix2_g[x+z*WB]);
+        float_result += (matrix1_g[y*HA+z] * matrix2_g[x+z*WB]);
     }
     result_matrix_g[x+y*WB] = float_result;
 }
 """%kernel_params).build()
 
 # Generate result variable and buffer to receive result
-result_matrix = numpy.empty((size_x, size_y)).astype(numpy.float32)
+result_matrix = numpy.empty((size_x, size_x)).astype(numpy.float32)
 for i in range(len(result_matrix)):
     for j in range(len(result_matrix[0])):
         result_matrix[i][j] = 0.0
@@ -164,10 +170,33 @@ gpu_time = t1-t0
 
 print("GPU took: " + str(gpu_time) + "s\n")
 
+# Compare results
+# Approximate results to the same decimal point to compare if all the results are equal
+for i in range(len(result_matrix)):
+    for j in range(len(result_matrix[0])):
+        result_matrix[i][j] = round(result_matrix[i][j],2)
+        matrix3[i][j] = round(matrix3[i][j],2)
+        result_matrix_multi[i][j] = round(result_matrix_multi[i][j],2)
+
 # Debugging/show result print
 # print(matrix3)
 # print(result_matrix_multi)
 # print(result_matrix)
+
+equals = True
+for i in range(len(result_matrix)):
+    if not numpy.array_equal(result_matrix[i], matrix3[i]):
+        equals = False
+    
+print("GPU multiplication is correct") if equals else print("GPU multiplication is incorrect")
+
+equals = True
+for i in range(len(result_matrix_multi)):
+    if not numpy.array_equal(result_matrix_multi[i], matrix3[i]):
+        equals = False
+
+print("CPU mulitcore multiplication is correct") if equals else print("CPU mulitcore multiplication is incorrect")
+
 
 # Compare execution times and get % increase in performance
 if (cpu_multi_time > cpu_single_time):
