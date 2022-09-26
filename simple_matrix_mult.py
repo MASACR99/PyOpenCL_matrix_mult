@@ -180,23 +180,22 @@ for i in range(len(result_matrix)):
 
 # Debugging/show result print
 # print(matrix3)
-# print(result_matrix_multi)
+#print(result_matrix_multi)
 # print(result_matrix)
 
-equals = True
-for i in range(len(result_matrix)):
-    if not numpy.array_equal(result_matrix[i], matrix3[i]):
-        equals = False
+# equals = True
+# for i in range(len(result_matrix)):
+#     if not numpy.array_equal(result_matrix[i], matrix3[i]):
+#         equals = False
     
-print("GPU multiplication is correct") if equals else print("GPU multiplication is incorrect")
+# print("GPU multiplication is correct") if equals else print("GPU multiplication is incorrect")
 
-equals = True
-for i in range(len(result_matrix_multi)):
-    if not numpy.array_equal(result_matrix_multi[i], matrix3[i]):
-        equals = False
+# equals = True
+# for i in range(len(result_matrix_multi)):
+#     if not numpy.array_equal(result_matrix_multi[i], matrix3[i]):
+#         equals = False
 
-print("CPU mulitcore multiplication is correct") if equals else print("CPU mulitcore multiplication is incorrect")
-
+# print("CPU mulitcore multiplication is correct") if equals else print("CPU mulitcore multiplication is incorrect")
 
 # Compare execution times and get % increase in performance
 if (cpu_multi_time > cpu_single_time):
