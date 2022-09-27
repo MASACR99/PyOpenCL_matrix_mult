@@ -7,8 +7,7 @@ from matrix import Matrix
 os.environ['PYOPENCL_CTX']='0'
 os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
 
-# TODO: Move single, multi and gpu into different functions to be called from outside
-# TODO: Make this a structure that stores the matrix, need functions to create/re-create the matrix
+# TODO: Check GPU multiplication and fix it when matrixes aren't squared (again)
 # TODO: Create new program to run single, multi and gpu separately multiple times and 
 # automatically generate a math plot with y axis being time taken and x axis being the size of the matrix (use matrix squares for simplicity)
 
@@ -35,7 +34,7 @@ matrixes = Matrix(size_x,size_y,size_y2)
 # Generate with specified sizes and fill with random float32 values
 
 print("Matrix 1 size: " + str(size_x) + ":" + str(size_y))
-print("Matrix 2 size: " + str(size_y) + ":" + str(size_x) + "\n")
+print("Matrix 2 size: " + str(size_y) + ":" + str(size_y2) + "\n")
 
 # If for some reason the matrixes are not multipliable, stop execution
 if not matrixes.isMultipliable():
@@ -98,8 +97,8 @@ for i in range(len(result_single)):
         result_gpu[i][j] = round(result_gpu[i][j],2)
 
 # Debugging/show result print
-# print(matrix3)
-#print(result_matrix_multi)
+print(result_single)
+print(result_gpu)
 # print(result_matrix)
 
 equals = Matrix.equals(result_single, result_multi)

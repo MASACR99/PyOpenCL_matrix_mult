@@ -113,7 +113,7 @@ class Matrix:
         matrix2_g = cl.Buffer(ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=self.getMatrix2())
 
         # Define parameters used in OpenCL code compilation/building
-        kernel_params = {"w_a":self.getSizeX1(), "h_a": self.getSizeY1(), "w_b": self.getSizeX2()}
+        kernel_params = {"w_a":self.getSizeX1(), "h_a": self.getSizeY1(), "w_b": self.getSizeY2()}
 
         prg = cl.Program(ctx, """
             #define WA %(w_a)d // Matrix A width
