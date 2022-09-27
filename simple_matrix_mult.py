@@ -97,8 +97,8 @@ for i in range(len(result_single)):
         result_gpu[i][j] = round(result_gpu[i][j],2)
 
 # Debugging/show result print
-print(result_single)
-print(result_gpu)
+# print(result_single)
+# print(result_gpu)
 # print(result_matrix)
 
 equals = Matrix.equals(result_single, result_multi)
