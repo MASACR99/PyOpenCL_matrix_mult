@@ -1,13 +1,16 @@
-import re
-from threading import Thread
-import pyopencl as cl
-import numpy
 import time
 import sys
 import os
 
+from matrix import Matrix
+
 os.environ['PYOPENCL_CTX']='0'
 os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
+
+# TODO: Move single, multi and gpu into different functions to be called from outside
+# TODO: Make this a structure that stores the matrix, need functions to create/re-create the matrix
+# TODO: Create new program to run single, multi and gpu separately multiple times and 
+# automatically generate a math plot with y axis being time taken and x axis being the size of the matrix (use matrix squares for simplicity)
 
 # Check input arguments from console command
 # and define sizes accordingly
@@ -17,24 +20,25 @@ if (len(sys.argv) > 1):
         size_y = int(sys.argv[2])
     else:
         size_y = int(sys.argv[1])
+    
+    if (len(sys.argv) > 3):
+        size_y2 = int(sys.argv[3])
+    else:
+        size_y2 = size_x
 else:
     size_x = 2
     size_y = 2
+    size_y2 = 2
+
+matrixes = Matrix(size_x,size_y,size_y2)
 
 # Generate with specified sizes and fill with random float32 values
-matrix1 = numpy.random.rand(size_x, size_y).astype(numpy.float32)
-matrix2 = numpy.random.rand(size_y, size_x).astype(numpy.float32)
 
 print("Matrix 1 size: " + str(size_x) + ":" + str(size_y))
 print("Matrix 2 size: " + str(size_y) + ":" + str(size_x) + "\n")
 
-# Start OpenCL context to select a GPU
-ctx = cl.create_some_context()
-# and generate Command Queue to send tasks
-queue = cl.CommandQueue(ctx)
-
 # If for some reason the matrixes are not multipliable, stop execution
-if (len(matrix1[0]) != len(matrix2)):
+if not matrixes.isMultipliable():
     print("Stinky")
     sys.exit(69)
 
@@ -42,19 +46,12 @@ print("First matrix multiplication with CPU single-core")
 
 t0 = time.time()
 
-# Generate matrix to sabe results in
-matrix3 = numpy.empty((size_x, size_x)).astype(numpy.float32)
-# Start single core multiplication
-for x in range(len(matrix3)):
-    for y in range(len(matrix3[0])):
-        matrix3[x][y] = 0
-        for z in range(len(matrix1[0])):
-            matrix3[x][y] += (matrix1[x][z]*matrix2[z][y])
+result_single = matrixes.multiplySingleCore()
          
 t1 = time.time()
 
 # Save execution time
-cpu_single_time = t1-t0
+cpu_single_time = round((t1-t0),6)
 
 print("CPU single took: " + str(cpu_single_time) + "s\n")
 # Debugging/show result print
@@ -63,48 +60,10 @@ print("CPU single took: " + str(cpu_single_time) + "s\n")
 print("CPU multithreading starts")
 
 # Define multithreaded function
-def multithread_multiplication(matrix1, matrix2, result_matrix, starting, jump):
-    x = 0
-    y = starting
-    while (y >= len(result_matrix[0])):
-        x += 1
-        y = y - len(result_matrix[0])
-    try:
-        while (x < len(result_matrix)):
-            result_matrix[x][y] = 0
-
-            for z in range(len(matrix1[0])):
-                result_matrix[x][y] += (matrix1[x][z]*matrix2[z][y])
-            
-            y = y + jump        
-            
-            while (y >= len(result_matrix[0])):
-                x += 1
-                y = y - len(result_matrix[0])
-            
-    except:
-        print("Something went wrong. X:" + str(x) + "Y:" + str(y))
     
 t0 = time.time()
 
-threads = []
-result_matrix_multi = numpy.empty((size_x, size_x)).astype(numpy.float32)
-# Find best thread size
-if (os.cpu_count() > (size_x*size_y)):
-    range_value = size_x*size_y
-else:
-    range_value = os.cpu_count()
-
-print("Number of threads to generate: " + str(range_value))
-# Generate and execute threads
-for i in range(range_value):
-    threads.append(Thread(target=multithread_multiplication,args=((matrix1, matrix2, result_matrix_multi,i,range_value))))
-
-for i in range(len(threads)):
-    threads[i].start()
-
-for i in range(len(threads)):
-    threads[i].join()
+result_multi = matrixes.multiplyMultiCore()
 
 t1 = time.time()
 
@@ -112,90 +71,44 @@ t1 = time.time()
 # print(result_matrix_multi)
 
 # Store execution time
-cpu_multi_time = t1-t0
+cpu_multi_time = round((t1-t0),6)
 print("CPU multi took: " + str(cpu_multi_time) + "s\n")
 
 print("GPU matrix multiplication begins")
 
 t0 = time.time()
 
-# Define variables for opencl use
-mf = cl.mem_flags
-matrix1_g = cl.Buffer(ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=matrix1)
-matrix2_g = cl.Buffer(ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=matrix2)
-
-# Define parameters used in OpenCL code compilation/building
-kernel_params = {"w_a":size_x, "h_a": size_y, "w_b": size_x}
-
-prg = cl.Program(ctx, """
-#define WA %(w_a)d // Matrix A width
-#define HA %(h_a)d // Matrix A height
-#define WB %(w_b)d // Matrix B width
-#define HB WA  // Matrix B height
-#define WC WB  // Matrix C width
-#define HC HA  // Matrix C height
-
-__kernel void multiplication(__global const float *matrix1_g, __global const float *matrix2_g, __global float *result_matrix_g){
-    int x = get_global_id(0);
-    int y = get_global_id(1);
-
-    __local float float_result;
-    float_result = 0;
-
-    for(int z = 0; z < HA;z++){
-        //printf("X: %%d Y: %%d Z: %%d -> %%f & %%f\\n",x,y,z,matrix1_g[y*WA+z],matrix2_g[x+z*WB]);
-        float_result += (matrix1_g[y*HA+z] * matrix2_g[x+z*WB]);
-    }
-    result_matrix_g[x+y*WB] = float_result;
-}
-"""%kernel_params).build()
-
-# Generate result variable and buffer to receive result
-result_matrix = numpy.empty((size_x, size_x)).astype(numpy.float32)
-for i in range(len(result_matrix)):
-    for j in range(len(result_matrix[0])):
-        result_matrix[i][j] = 0.0
-result_matrix_g = cl.Buffer(ctx, mf.WRITE_ONLY, result_matrix.nbytes)
-
-knl = prg.multiplication
-event = knl(queue, result_matrix.shape, None, matrix1_g,matrix2_g,result_matrix_g)
-event.wait()
-
-cl.enqueue_copy(queue, result_matrix, result_matrix_g)
+result_gpu, time_build = matrixes.GPUMultiplication()
 
 t1 = time.time()
 
 # Store execution time
-gpu_time = t1-t0
+gpu_time = round((t1-t0),6)
+time_build = round(time_build,6)
 
 print("GPU took: " + str(gpu_time) + "s\n")
+print("Separated between build time: " + str(time_build) + " and processing time: " + str(round((gpu_time-time_build),6)))
 
 # Compare results
 # Approximate results to the same decimal point to compare if all the results are equal
-for i in range(len(result_matrix)):
-    for j in range(len(result_matrix[0])):
-        result_matrix[i][j] = round(result_matrix[i][j],2)
-        matrix3[i][j] = round(matrix3[i][j],2)
-        result_matrix_multi[i][j] = round(result_matrix_multi[i][j],2)
+for i in range(len(result_single)):
+    for j in range(len(result_single[0])):
+        result_single[i][j] = round(result_single[i][j],2)
+        result_multi[i][j] = round(result_multi[i][j],2)
+        result_gpu[i][j] = round(result_gpu[i][j],2)
 
 # Debugging/show result print
 # print(matrix3)
 #print(result_matrix_multi)
 # print(result_matrix)
 
-# equals = True
-# for i in range(len(result_matrix)):
-#     if not numpy.array_equal(result_matrix[i], matrix3[i]):
-#         equals = False
+equals = Matrix.equals(result_single, result_multi)
     
-# print("GPU multiplication is correct") if equals else print("GPU multiplication is incorrect")
+print("CPU multicore is correct") if equals else print("CPU multicore is incorrect")
 
-# equals = True
-# for i in range(len(result_matrix_multi)):
-#     if not numpy.array_equal(result_matrix_multi[i], matrix3[i]):
-#         equals = False
+equals = Matrix.equals(result_single, result_gpu)
 
-# print("CPU mulitcore multiplication is correct") if equals else print("CPU mulitcore multiplication is incorrect")
+print("GPU multiplication is correct") if equals else print("GPU multiplication is incorrect")
 
 # Compare execution times and get % increase in performance
 if (cpu_multi_time > cpu_single_time):
@@ -212,4 +125,4 @@ print("")
 if (cpu_fastest > gpu_time):
     print("GPU was faster than CPU " + cpu_fastest_name + " by " + str(round((cpu_fastest*100)/gpu_time,2)) + "%")
 else:
-    print("CPU was faster than GPU by " + str(round((gpu_time*100)/cpu_fastest,2)) + "%")
+    print("CPU was faster than GPU by " + str(round((gpu_time*100)/cpu_fastest,2)) + "% if we count the build time")
